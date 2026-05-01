@@ -23,59 +23,53 @@
         }
 
         .header { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--primary); font-weight: bold; margin-bottom: 10px; }
-
         .target-word { font-size: 3.2rem; font-weight: 900; color: var(--accent); margin: 0; text-transform: uppercase; letter-spacing: 2px; }
         .instruction { font-size: 1rem; color: #94a3b8; margin: 10px 0 20px 0; font-weight: bold; }
 
-        /* OYUN ALANI DÜZENİ (YAN YANA) */
         .game-row {
-            display: flex;
-            flex-direction: row;
-            justify-content: center;
-            align-items: flex-end;
-            gap: 10px;
-            margin-bottom: 25px;
-            flex-wrap: nowrap;
+            display: flex; flex-direction: row; justify-content: center;
+            align-items: flex-end; gap: 10px; margin-bottom: 25px; flex-wrap: nowrap;
         }
 
-        /* ÇİZİM KUTUSU (İLK KUTU) */
         .canvas-box {
-            background: #fff;
-            border: 4px solid var(--primary);
-            border-radius: 20px;
-            width: 120px; /* Diğer kutulardan biraz daha geniş */
-            height: 100px;
-            position: relative;
-            flex-shrink: 0;
+            background: #fff; border: 4px solid var(--primary);
+            border-radius: 20px; width: 120px; height: 100px;
+            position: relative; flex-shrink: 0;
+            transition: border-color 0.3s;
         }
+        /* Çizim kutusunun duruma göre rengi değişir */
+        .canvas-box.checking { border-color: var(--hint); }
+        .canvas-box.correct  { border-color: #00b894; }
+        .canvas-box.wrong    { border-color: #d63031; }
+
         canvas { width: 100%; height: 100%; border-radius: 16px; cursor: crosshair; }
 
-        /* HARF KUTULARI */
         .letter-box {
-            background: #fff;
-            width: 70px;
-            height: 90px; /* Çizim kutusuyla dengeli durması için */
-            border-radius: 20px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 6px 0 #cbd5e1;
-            flex-shrink: 0;
+            background: #fff; width: 70px; height: 90px; border-radius: 20px;
+            display: flex; flex-direction: column; justify-content: center;
+            align-items: center; box-shadow: 0 6px 0 #cbd5e1; flex-shrink: 0;
         }
-
         .letter-box input {
             width: 80%; border: none; border-bottom: 3px solid var(--primary);
             text-align: center; font-size: 2rem; font-weight: bold;
             color: #2d3436; outline: none; background: transparent;
         }
-
         .box-label { font-size: 0.6rem; color: #636e72; margin-top: 5px; font-weight: bold; }
 
         .btn-check {
             width: 100%; padding: 20px; background: var(--primary); color: white;
             border: none; border-radius: 22px; font-size: 1.5rem; font-weight: 900;
-            cursor: pointer; box-shadow: 0 8px 0 #4834d4;
+            cursor: pointer; box-shadow: 0 8px 0 #4834d4; transition: opacity 0.2s;
+        }
+        .btn-check:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* AI durum mesajı */
+        #ai-status {
+            margin: 10px 0;
+            font-size: 0.85rem;
+            min-height: 20px;
+            color: var(--hint);
+            font-weight: bold;
         }
 
         .hint-btn {
@@ -95,17 +89,14 @@
 
 <div id="game-container">
     <div class="header"><span>KOLAY</span><span>∞</span></div>
-
     <div class="target-word" id="target">ELMA</div>
     <div class="instruction">Resmi çiz, harflerle tamamla!</div>
 
-    <!-- TÜM PARÇALAR YAN YANA -->
-    <div class="game-row" id="game-row">
-        <!-- Buraya dinamik olarak çizim alanı ve inputlar gelecek -->
-    </div>
+    <div class="game-row" id="game-row"></div>
 
-    <button class="btn-check" onclick="check()">KONTROL ET</button>
+    <div id="ai-status"></div>
 
+    <button class="btn-check" id="checkBtn" onclick="check()">KONTROL ET</button>
     <div class="hint-btn" onclick="playAd()">📺 Reklam İzle & İpucu Al</div>
     <p style="color:#64748b; font-size:0.7rem; margin-top:15px; cursor:pointer;" onclick="clearDraw()">Çizimi Temizle</p>
 </div>
@@ -116,12 +107,17 @@
 </div>
 
 <script>
-    // ANA KURGU VERİSİ
-    // word: Tam kelime, drawPart: Çizilmesi gereken kısım, letters: Kalan harfler
+    // =====================================================
+    // ÖNEMLİ: Buraya kendi Vercel adresini yaz!
+    // Vercel'e yükleyince sana bir URL verecek, onu buraya yapıştır.
+    // Örnek: "https://oyunum.vercel.app/api/check-drawing"
+    // =====================================================
+    const API_URL = "https://kelimelemece-git-main-eneskrbyks-projects.vercel.app/api/check-drawing";
+    
     const levels = [
-        { word: "ELMA", drawPart: "EL", letters: ["M", "A"] },
-        { word: "ARABA", drawPart: "ARI", letters: ["B", "A"] }, // Arı(çiz) + B + A = Araba (burada harflere göre kurgu değişebilir)
-        { word: "KUMBARA", drawPart: "KUM", letters: ["B", "A", "R", "A"] }
+        { word: "ELMA",   drawPart: "EL",  letters: ["M", "A"] },
+        { word: "ARABA",  drawPart: "ARA", letters: ["B", "A"] },
+        { word: "KUMBARA",drawPart: "KUM", letters: ["B", "A", "R", "A"] }
     ];
 
     let current = 0;
@@ -131,15 +127,15 @@
         const data = levels[current];
         const row = document.getElementById('game-row');
         document.getElementById('target').innerText = data.word;
+        document.getElementById('ai-status').innerText = '';
         row.innerHTML = '';
 
-        // 1. Çizim Kutusu (Sol Başta)
         const cBox = document.createElement('div');
         cBox.className = 'canvas-box';
+        cBox.id = 'canvasBox';
         cBox.innerHTML = `<canvas id="cvs"></canvas><div style="position:absolute; bottom:5px; width:100%; font-size:8px; color:#ccc;">"${data.drawPart}" ÇİZ</div>`;
         row.appendChild(cBox);
 
-        // 2. Harf Kutuları (Yan Yana)
         data.letters.forEach((char, i) => {
             const lBox = document.createElement('div');
             lBox.className = 'letter-box';
@@ -168,6 +164,85 @@
         window.onmouseup = window.ontouchend = () => isDrawing = false;
     }
 
+    // Canvas'ı base64 PNG'ye çevirir (Vercel'e göndermek için)
+    function getCanvasImage() {
+        const c = document.getElementById('cvs');
+        // "data:image/png;base64,..." formatından sadece base64 kısmını al
+        return c.toDataURL('image/png').split(',')[1];
+    }
+
+    // Canvas'ta gerçekten bir şey çizilmiş mi kontrol et
+    function isCanvasEmpty() {
+        const c = document.getElementById('cvs');
+        const ctx = c.getContext('2d');
+        const pixels = ctx.getImageData(0, 0, c.width, c.height).data;
+        // Tüm pikseller şeffafsa canvas boştur
+        return !pixels.some((val, i) => i % 4 === 3 && val > 0);
+    }
+
+    async function check() {
+        const data = levels[current];
+        const statusEl = document.getElementById('ai-status');
+        const btn = document.getElementById('checkBtn');
+        const canvasBox = document.getElementById('canvasBox');
+
+        // 1. Harfleri kontrol et
+        let lettersCorrect = true;
+        data.letters.forEach((char, i) => {
+            if (document.getElementById(`L${i}`).value.toUpperCase() !== char) {
+                lettersCorrect = false;
+            }
+        });
+
+        if (!lettersCorrect) {
+            alert("Harfler hatalı! Tekrar dene.");
+            return;
+        }
+
+        // 2. Canvas boş mu?
+        if (isCanvasEmpty()) {
+            alert("Önce bir şeyler çiz!");
+            return;
+        }
+
+        // 3. AI'ya çizimi gönder
+        btn.disabled = true;
+        canvasBox.className = 'canvas-box checking';
+        statusEl.innerText = "🤖 AI çizimini inceliyor...";
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image: getCanvasImage(),
+                    word: data.drawPart // Çizilmesi gereken kısım
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.correct) {
+                canvasBox.className = 'canvas-box correct';
+                statusEl.innerText = "✅ Harika çizim!";
+                setTimeout(() => {
+                    alert("Tebrikler! Hem çizim hem harfler doğru!");
+                    current = (current + 1) % levels.length;
+                    init();
+                }, 800);
+            } else {
+                canvasBox.className = 'canvas-box wrong';
+                statusEl.innerText = "❌ Çizim '" + data.drawPart + "' gibi görünmüyor, tekrar dene!";
+                btn.disabled = false;
+            }
+
+        } catch (err) {
+            statusEl.innerText = "⚠️ Bağlantı hatası, tekrar dene.";
+            canvasBox.className = 'canvas-box';
+            btn.disabled = false;
+        }
+    }
+
     function playAd() {
         const ad = document.getElementById('ad-view');
         ad.style.display = 'flex';
@@ -190,25 +265,11 @@
         }
     }
 
-    function clearDraw() { 
+    function clearDraw() {
         const c = document.getElementById('cvs');
-        c.getContext('2d').clearRect(0,0,c.width,c.height); 
-    }
-
-    function check() {
-        const data = levels[current];
-        let win = true;
-        data.letters.forEach((char, i) => {
-            if(document.getElementById(`L${i}`).value.toUpperCase() !== char) win = false;
-        });
-
-        if(win) {
-            alert("Tebrikler! Kelimeyi tamamladın.");
-            current = (current + 1) % levels.length;
-            init();
-        } else {
-            alert("Harfler hatalı!");
-        }
+        c.getContext('2d').clearRect(0,0,c.width,c.height);
+        document.getElementById('canvasBox').className = 'canvas-box';
+        document.getElementById('ai-status').innerText = '';
     }
 
     init();
