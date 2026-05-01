@@ -25,7 +25,7 @@ module.exports = async function handler(req, res) {
                 }
               },
               {
-                text: `Bu çizim "${word}" kelimesiyle ilgili mi? Sadece EVET veya HAYIR yaz, başka hiçbir şey yazma.`
+                text: `Bu çizim "${word}" kelimesiyle ilgili mi? Sadece EVET veya HAYIR yaz.`
               }
             ]
           }]
@@ -34,13 +34,18 @@ module.exports = async function handler(req, res) {
     );
 
     const data = await response.json();
-    const answer = data.candidates[0].content.parts[0].text.trim().toUpperCase();
+    
+    // Hata ayıklama için tam cevabı logla
+    console.log('Gemini cevabı:', JSON.stringify(data));
+
+    // Güvenli okuma
+    const answer = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || '';
     const isCorrect = answer.includes('EVET');
 
-    return res.status(200).json({ correct: isCorrect });
+    return res.status(200).json({ correct: isCorrect, answer });
 
   } catch (err) {
-    console.error('Gemini API hatası:', err);
-    return res.status(500).json({ error: 'Sunucu hatası' });
+    console.error('Gemini API hatası:', err.message);
+    return res.status(500).json({ error: err.message });
   }
-}
+};
